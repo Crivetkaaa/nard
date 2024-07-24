@@ -22,7 +22,7 @@ class User:
         self.user_id = user_id
         self.move = 0
         self.distance = 0
-        self.game = int
+        self.game = 1
         self.move_info = 0
 
     async def update_mean(self, mean):
@@ -40,17 +40,11 @@ class User:
         await bot.send_message(chat_id=self.user_id, text=text, reply_markup=keyboard)
 
     async def end_game(self, status):
-        database.execute_nowait(f"INSERT INTO games(login, moves, distance, winner) VALUES(?, ?, ?, ?)", params=(self.user_id, self.move, self.distance, status))
+        database.execute_nowait(f"INSERT INTO games(game, login, moves, distance, winner) VALUES(?, ?, ?, ?, ?)", params=(self.game, self.user_id, self.move, self.distance, status))
         self.game += 1
         self.move = 0
         self.distance = 0
 
-    async def full_stats(self):
-        game = await database.execute(sql=f"SELECT * FROM games WHERE login={self.user_id} ORDER BY game DESC LIMIT 1")
-        try:
-            self.game = game[0][0] + 1
-        except:
-            self.game = 1
     async def most_frequent_pair(self, arr):
         frequency = {}
         
@@ -65,17 +59,19 @@ class User:
         return most_common_pair
 
     async def get_stats(self):
-        all_game = await database.execute(sql=f"SELECT COUNT(*) FROM games WHERE login={self.user_id}")
-        win_game = await database.execute(sql=f"SELECT COUNT(*) FROM games WHERE login={self.user_id} AND winner={1}")
-        pairs = await database.execute(sql=f"SELECT meaning_1, meaning_2 FROM meaning WHERE login={self.user_id}")
-        distance = await database.execute(sql=f"SELECT SUM(distance) FROM games WHERE login={self.user_id}")
-        moves = await database.execute(sql=f"SELECT SUM(moves) FROM games WHERE login={self.user_id}")
-        distance_per_step = distance[0][0]/moves[0][0]
-        move_per_game = moves[0][0]/all_game[0][0]
-        
-        most_pair = await self.most_frequent_pair(pairs)
-        return all_game[0][0], win_game[0][0], most_pair, distance_per_step, move_per_game
-
+        try: 
+            all_game = await database.execute(sql=f"SELECT COUNT(*) FROM games WHERE login={self.user_id}")
+            win_game = await database.execute(sql=f"SELECT COUNT(*) FROM games WHERE login={self.user_id} AND winner={1}")
+            pairs = await database.execute(sql=f"SELECT meaning_1, meaning_2 FROM meaning WHERE login={self.user_id}")
+            distance = await database.execute(sql=f"SELECT SUM(distance) FROM games WHERE login={self.user_id}")
+            moves = await database.execute(sql=f"SELECT SUM(moves) FROM games WHERE login={self.user_id}")
+            distance_per_step = distance[0][0]/moves[0][0]
+            move_per_game = moves[0][0]/all_game[0][0]
+            
+            most_pair = await self.most_frequent_pair(pairs)
+            return all_game[0][0], win_game[0][0], most_pair, distance_per_step, move_per_game
+        except:
+            return 0, 0, (0, 0), 0, 0
     
 class Global:
     users = dict()
@@ -99,14 +95,14 @@ async def callback(callback: types.CallbackQuery):
     elif call[0] == 'change_move':
         await FSMMove.move.set()
         await usr.send_message('Какое расстояние прошёл?', UserKeyboard.move_keyboard(usr.move_info['first_cube'], usr.move_info['second_cube']))
+
+    await callback.answer()
         
 
 
 
 async def start(msg: types.Message):
     usr = await Global.get_user_by_id(msg.from_user.id)
-    await usr.full_stats()
-    print(type(msg.from_user.id))
     await usr.send_message(text='Член', keyboard=UserKeyboard.start_keyboard())
 
 

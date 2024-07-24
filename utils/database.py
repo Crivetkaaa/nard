@@ -11,7 +11,7 @@ database = DB_worker('files/bot_db.sqlite')
 database.start()
 
 database.execute_nowait("""CREATE TABLE IF NOT EXISTS games (
-        game INTEGER PRIMARY KEY AUTOINCREMENT,
+        game INTEGER,
         login BIGINT,
         moves INTEGER,
         distance FLOAT,
